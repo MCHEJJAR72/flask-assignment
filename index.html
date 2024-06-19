@@ -1,0 +1,149 @@
+1. Setting Up Flask Project
+Install Dependencies
+install Flask Flask-Login==0.5.0 flask-marshmallow==0.14.0
+Initialize Flask App
+Create a basic structure for Flask application:
+from flask import Flask
+from flask_login import LoginManager
+from flask_marshmallow import Marshmallow
+from flask_sqlalchemy import SQLAlchemy
+
+app = Flask(__name__)
+app.config['SECRET_KEY'] = 'your_secret_key_here'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///your_database.db'
+db = SQLAlchemy(app)
+ma = Marshmallow(app)
+
+# Initialize Flask-Login
+login_manager = LoginManager()
+login_manager.init_app(app)
+
+# Import your models and routes here
+from models import User, Car  # Replace with your actual models
+from routes import auth, cars  # Replace with your actual routes
+
+# Register blueprints
+app.register_blueprint(auth)
+app.register_blueprint(cars)
+
+if __name__ == '__main__':
+    app.run(debug=True)
+2. User Authentication with Flask-Login
+Implement user authentication using Flask-Login. I'll need to create models for User and Car User Model:
+# models.py
+
+from flask_login import UserMixin
+from app import db
+
+class User(UserMixin, db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(100), unique=True, nullable=False)
+    password = db.Column(db.String(100), nullable=False)
+Authentication Routes
+Create routes for login, logout, and protected profile access:
+# routes/auth.py
+
+from flask import Blueprint, request, jsonify
+from flask_login import login_user, logout_user, login_required, current_user
+from werkzeug.security import check_password_hash
+from models import db, User
+
+auth = Blueprint('auth', __name__)
+
+@auth.route('/login', methods=['POST'])
+def login():
+    data = request.get_json()
+    email = data.get('email')
+    password = data.get('password')
+
+    user = User.query.filter_by(email=email).first()
+    if user and check_password_hash(user.password, password):
+        login_user(user)
+        return jsonify({'message': 'Login successful'}), 200
+    else:
+        return jsonify({'message': 'Invalid credentials'}), 401
+
+@auth.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return jsonify({'message': 'Logged out successfully'}), 200
+
+@auth.route('/profile')
+@login_required
+def profile():
+    return jsonify({'message': 'You are logged in as: ' + current_user.email}), 200
+3. CRUD Operations for Car Model
+Implement CRUD operations for managing Car entities:
+Car Model
+# models.py
+
+class Car(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    make = db.Column(db.String(100), nullable=False)
+    model = db.Column(db.String(100), nullable=False)
+    year = db.Column(db.Integer)
+    # Add more fields as needed
+Car Routes
+Create routes for CRUD operations on the Car model:
+# routes/cars.py
+
+from flask import Blueprint, request, jsonify
+from flask_login import login_required
+from models import db, Car
+
+cars = Blueprint('cars', __name__)
+
+@cars.route('/cars', methods=['GET'])
+@login_required
+def get_cars():
+    cars = Car.query.all()
+    cars_list = []
+    for car in cars:
+        cars_list.append({'id': car.id, 'make': car.make, 'model': car.model, 'year': car.year})
+    return jsonify({'cars': cars_list}), 200
+
+@cars.route('/cars/<int:car_id>', methods=['GET'])
+@login_required
+def get_car(car_id):
+    car = Car.query.get_or_404(car_id)
+    return jsonify({'id': car.id, 'make': car.make, 'model': car.model, 'year': car.year}), 200
+
+@cars.route('/cars', methods=['POST'])
+@login_required
+def create_car():
+    data = request.get_json()
+    make = data.get('make')
+    model = data.get('model')
+    year = data.get('year')
+
+    new_car = Car(make=make, model=model, year=year)
+    db.session.add(new_car)
+    db.session.commit()
+
+    return jsonify({'message': 'Car created successfully'}), 201
+
+@cars.route('/cars/<int:car_id>', methods=['PUT'])
+@login_required
+def update_car(car_id):
+    car = Car.query.get_or_404(car_id)
+    data = request.get_json()
+    car.make = data.get('make', car.make)
+    car.model = data.get('model', car.model)
+    car.year = data.get('year', car.year)
+    db.session.commit()
+
+    return jsonify({'message': 'Car updated successfully'}), 200
+
+@cars.route('/cars/<int:car_id>', methods=['DELETE'])
+@login_required
+def delete_car(car_id):
+    car = Car.query.get_or_404(car_id)
+    db.session.delete(car)
+    db.session.commit()
+
+    return jsonify({'message': 'Car deleted successfully'}), 200
+4. Testing Your Application
+•	Run Application: Start Flask application (python app.py) and test API endpoints using a tool like Postman or curl.
+•	User Authentication: Ensure login/logout functionality works correctly.
+•	CRUD Operations: Test creating, retrieving, updating, and deleting cars via your API endpoints.
